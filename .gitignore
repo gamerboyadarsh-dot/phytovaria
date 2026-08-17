@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.db
+*.sqlite3
+.env
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/.env
+.npm/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Secrets — NEVER commit these
+*.pem
+*.key
+*.cert
+secrets.json
+credentials.json
+
+# ML models — large files (comment out if you want to track them)
+# project/ml/models/*.joblib
+# project/ml/data/*.csv

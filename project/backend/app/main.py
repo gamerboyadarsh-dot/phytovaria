@@ -9,7 +9,8 @@ import sys
 from datetime import datetime
 from typing import List
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -28,16 +29,80 @@ try:
 except Exception:
     ML_AVAILABLE = False
 
+# DB init (simplified for demo)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Genomic Plant Health Platform API", version="0.1.0")
+app = FastAPI(
+    title="PhytoVaria API",
+    description="Genomic variation & risk prediction backend",
+    version="1.0.0"
+)
 
+# CORS
+origins = os.environ.get("ALLOW_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # tighten before real deployment
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Auth Dependency
+from .auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from jose import jwt, JWTError
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+@app.post("/api/auth/register", response_model=schemas.UserOut)
+def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    hashed_password = get_password_hash(user.password)
+    new_user = models.User(email=user.email, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@app.post("/api/auth/login", response_model=schemas.Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    
+    from datetime import timedelta
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# -------------------------------------------------------------------------
+# API Endpoints
+# -------------------------------------------------------------------------
 
 DISEASES = ["Early Blight", "Late Blight", "Fusarium Wilt"]
 
@@ -314,6 +379,146 @@ def analyze_risk(plant_code: str, db: Session = Depends(get_db)):
         disclaimer=DISCLAIMER,
         results=results,
     )
+
+
+@app.get("/api/health")
+def get_health():
+    return {"status": "ok", "version": "1.0.0", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/api/stats")
+def get_stats(db: Session = Depends(get_db)):
+    total_plants = db.query(models.Plant).count()
+    plants = db.query(models.Plant).all()
+    plants_analyzed = 0
+    high_risk = 0
+    moderate_risk = 0
+    low_risk = 0
+    for p in plants:
+        if p.risk_scores:
+            plants_analyzed += 1
+            latest_scores = sorted(p.risk_scores, key=lambda rs: rs.created_at, reverse=True)
+            if not latest_scores:
+                continue
+            latest_time = latest_scores[0].created_at
+            current_scores = [rs for rs in latest_scores if rs.created_at == latest_time]
+            levels = [rs.risk_level for rs in current_scores]
+            if "HIGH" in levels:
+                high_risk += 1
+            elif "MEDIUM" in levels:
+                moderate_risk += 1
+            else:
+                low_risk += 1
+
+    recent = db.query(models.RiskScore).order_by(models.RiskScore.created_at.desc()).limit(5).all()
+    recent_analyses = [{
+        "plant_code": r.plant.plant_code if r.plant else "UNKNOWN",
+        "disease": r.disease,
+        "risk_level": r.risk_level,
+        "risk_score": r.risk_score,
+        "created_at": r.created_at.isoformat()
+    } for r in recent]
+
+    return {
+        "total_plants": total_plants,
+        "high_risk": high_risk,
+        "moderate_risk": moderate_risk,
+        "low_risk": low_risk,
+        "plants_analyzed": plants_analyzed,
+        "recent_analyses": recent_analyses
+    }
+
+
+@app.get("/api/plants/{plant_code}/report")
+def get_plant_report(plant_code: str, db: Session = Depends(get_db)):
+    plant = db.query(models.Plant).filter(models.Plant.plant_code == plant_code).first()
+    if not plant:
+        raise HTTPException(404, "plant not found")
+        
+    latest_env = (
+        db.query(models.EnvironmentReading)
+        .filter(models.EnvironmentReading.plant_id == plant.id)
+        .order_by(models.EnvironmentReading.timestamp.desc())
+        .first()
+    )
+    
+    latest_rs = (
+        db.query(models.RiskScore)
+        .filter(models.RiskScore.plant_id == plant.id)
+        .order_by(models.RiskScore.created_at.desc())
+        .first()
+    )
+    
+    risk_results = []
+    if latest_rs:
+        latest_time = latest_rs.created_at
+        current_scores = (
+            db.query(models.RiskScore)
+            .filter(models.RiskScore.plant_id == plant.id, models.RiskScore.created_at == latest_time)
+            .all()
+        )
+        for rs in current_scores:
+            risk_results.append(json.loads(rs.explanation_json))
+            
+    variants = [pv.variant for pv in plant.variants]
+    
+    return {
+        "plant": plant,
+        "variants": variants,
+        "risk_results": risk_results,
+        "environment": latest_env,
+        "generated_at": datetime.utcnow().isoformat(),
+        "disclaimer": DISCLAIMER,
+        "methodology": "Rule-based + RF demo pipeline"
+    }
+
+
+@app.get("/api/demo/sensor")
+def get_demo_sensor():
+    return {
+        "plant_id": "TOMATO-001",
+        "temperature": 29.4,
+        "humidity": 81.0,
+        "soil_moisture": 55.0,
+        "light": 620.0,
+        "timestamp": datetime.utcnow().isoformat(),
+        "mode": "DEMO"
+    }
+
+
+@app.get("/api/plants/{plant_code}/environment/history", response_model=List[schemas.EnvironmentOut])
+def get_env_history(plant_code: str, db: Session = Depends(get_db)):
+    plant = db.query(models.Plant).filter(models.Plant.plant_code == plant_code).first()
+    if not plant:
+        raise HTTPException(404, "plant not found")
+    readings = (
+        db.query(models.EnvironmentReading)
+        .filter(models.EnvironmentReading.plant_id == plant.id)
+        .order_by(models.EnvironmentReading.timestamp.desc())
+        .limit(20)
+        .all()
+    )
+    return readings
+
+
+@app.get("/api/plants/{plant_code}/risk/history")
+def get_risk_history(plant_code: str, db: Session = Depends(get_db)):
+    plant = db.query(models.Plant).filter(models.Plant.plant_code == plant_code).first()
+    if not plant:
+        raise HTTPException(404, "plant not found")
+    scores = (
+        db.query(models.RiskScore)
+        .filter(models.RiskScore.plant_id == plant.id)
+        .order_by(models.RiskScore.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    return [{
+        "disease": rs.disease,
+        "risk_level": rs.risk_level,
+        "risk_score": rs.risk_score,
+        "created_at": rs.created_at.isoformat()
+    } for rs in scores]
 
 
 @app.get("/")
