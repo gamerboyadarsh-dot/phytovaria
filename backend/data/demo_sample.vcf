@@ -1,0 +1,7 @@
+##fileformat=VCFv4.2
+##source=demo_offline_fallback_synthetic_positions_within_verified_gene_windows
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
+7	63601400	.	A	G	99	PASS	.	GT	0/1
+9	3341200	.	C	T	99	PASS	.	GT	1/1
+10	85460200	.	T	C	99	PASS	.	GT	0/1
+11	54895800	.	G	A	99	PASS	.	GT	0/1

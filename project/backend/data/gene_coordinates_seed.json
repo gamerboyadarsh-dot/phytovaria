@@ -1,0 +1,54 @@
+{
+  "_notes": "Verified positions pulled from published mapping studies and SGN locus pages (SL2.50 genome build). Where only a marker interval size is known (not exact bp), a window is estimated around the cited anchor position and flagged 'approximate_window'. Ph-3 has no single confirmed Solyc gene ID in public literature as of this seed -- it is left as chromosome-level only, honestly flagged, rather than guessed.",
+
+  "genes": [
+    {
+      "gene_symbol": "I-2",
+      "solyc_id": "Solyc11g071430",
+      "chromosome": "11",
+      "genome_build": "SL2.50",
+      "anchor_position": 54895724,
+      "window_bp": 30000,
+      "start": 54865724,
+      "end": 54925724,
+      "position_type": "approximate_window",
+      "source_citation": "I-2 locus SNP marker M4 at 54,895,724 bp, chr11, SL2.50 (patent US filing citing SGN/marker data); gene cluster Solyc11g071390-071430 per Seifi et al. 2012, New Phytologist"
+    },
+    {
+      "gene_symbol": "I-3",
+      "solyc_id": "unresolved (candidate interval, not single cloned Solyc ID as of this seed)",
+      "chromosome": "7",
+      "genome_build": "SL2.50",
+      "anchor_position": 63601308,
+      "window_bp": 60000,
+      "start": 63571308,
+      "end": 63631308,
+      "position_type": "approximate_window",
+      "source_citation": "Catanzariti et al. 2015, New Phytologist -- I-3 mapped to 50-60kb interval between markers RGA332 and bP23/gPT, chr7; SGN TGRC locus page position SL2.50ch07:63601308"
+    },
+    {
+      "gene_symbol": "Ph-2",
+      "solyc_id": "Solyc10g085460",
+      "chromosome": "10",
+      "genome_build": "SL2.50 / SL4.0 (Solyc IDs stable across builds for this locus per source)",
+      "anchor_position": null,
+      "window_bp": null,
+      "start": null,
+      "end": null,
+      "position_type": "gene_id_only_no_bp_confirmed_in_this_seed",
+      "source_citation": "Identification and Functional Analysis of the Ph-2 Gene, Plants (MDPI) 2024, PMC11679936 -- Solyc10g085460 (RGA1) validated as Ph-2 via knockout/complementation"
+    },
+    {
+      "gene_symbol": "Ph-3",
+      "solyc_id": "candidate region only -- nearby RGAs Solyc09g092280 / 092290 / 092300 / 092310, no single confirmed Ph-3 Solyc ID found in this seed's sources",
+      "chromosome": "9",
+      "genome_build": "Heinz1706 reference",
+      "anchor_position": null,
+      "window_bp": null,
+      "start": null,
+      "end": null,
+      "position_type": "chromosome_level_only_HONEST_GAP",
+      "source_citation": "Zhang et al. 2013/2014, Ph-3 fine-mapped to 26-74kb region, distal long arm chr9, flanked by markers G2-4/M8-2; exact Solyc ID not resolved in these sources"
+    }
+  ]
+}
