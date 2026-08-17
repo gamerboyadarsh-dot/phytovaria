@@ -104,82 +104,38 @@ export interface VCFUploadResult {
   variants_linked: number;
 }
 
-// ─── Internal Fetch Wrapper ──────────────────────────────────────────────────
+// ─── Helper ───────────────────────────────────────────────────────────────────
 
-let authToken: string | null = null;
-
-async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const headers = new Headers(options.headers || {});
-  
-  // Attach token if exists
-  if (authToken) {
-    headers.set('Authorization', `Bearer ${authToken}`);
-  }
-
-  // Only set Content-Type if we're not sending FormData
-  if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
-    headers,
   });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`API ${res.status}: ${err}`);
   }
-  return response.json();
+  return res.json() as Promise<T>;
 }
 
-// ─── API Methods ─────────────────────────────────────────────────────────────
+// ─── Plants ───────────────────────────────────────────────────────────────────
 
 export const api = {
-  // Auth
-  setToken: (token: string | null) => { authToken = token; },
-  
-  login: async (creds: LoginCredentials) => {
-    // OAuth2PasswordRequestForm requires form-urlencoded data
-    const formData = new URLSearchParams();
-    formData.append('username', creds.username);
-    formData.append('password', creds.password);
-    
-    return fetchApi<{ access_token: string }>('/api/auth/login', {
-      method: 'POST',
-      body: formData,
-    });
-  },
-
-  register: async (creds: RegisterCredentials) => {
-    return fetchApi<User>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(creds),
-    });
-  },
-
   // Health
-  health: () => fetchApi<{ status: string; version: string }>('/api/health'),
+  health: () => request<{ status: string; version: string }>('/api/health'),
 
   // Plants
-  listPlants: () => fetchApi<Plant[]>('/api/plants'),
-  getPlant: (code: string) => fetchApi<Plant>(`/api/plants/${code}`),
+  listPlants: () => request<Plant[]>('/api/plants'),
+  getPlant: (code: string) => request<Plant>(`/api/plants/${code}`),
   registerPlant: (data: PlantCreate) =>
-    fetchApi<Plant>('/api/plants', { method: 'POST', body: JSON.stringify(data) }),
+    request<Plant>('/api/plants', { method: 'POST', body: JSON.stringify(data) }),
 
   // VCF
   uploadVCF: (plantCode: string, file: File): Promise<VCFUploadResult> => {
     const form = new FormData();
     form.append('file', file);
-    
-    const headers = new Headers();
-    if (authToken) {
-      headers.set('Authorization', `Bearer ${authToken}`);
-    }
-
     return fetch(`${BASE_URL}/api/plants/${plantCode}/upload-vcf`, {
       method: 'POST',
-      headers,
       body: form,
     }).then(async (r) => {
       if (!r.ok) throw new Error(`Upload failed: ${await r.text()}`);
@@ -188,28 +144,28 @@ export const api = {
   },
 
   // Variants
-  getVariants: (code: string) => fetchApi<Variant[]>(`/api/plants/${code}/variants`),
+  getVariants: (code: string) => request<Variant[]>(`/api/plants/${code}/variants`),
 
   // Environment
   getLatestEnv: (code: string) =>
-    fetchApi<EnvironmentReading>(`/api/plants/${code}/environment/latest`),
+    request<EnvironmentReading>(`/api/plants/${code}/environment/latest`),
   getEnvHistory: (code: string) =>
-    fetchApi<EnvironmentReading[]>(`/api/plants/${code}/environment/history`),
+    request<EnvironmentReading[]>(`/api/plants/${code}/environment/history`),
   postSensorData: (data: {
     plant_id: string;
     temperature?: number;
     humidity?: number;
     soil_moisture?: number;
     light?: number;
-  }) => fetchApi<EnvironmentReading>('/api/sensor-data', { method: 'POST', body: JSON.stringify(data) }),
-  getDemoSensor: () => fetchApi<DemoSensor>('/api/demo/sensor'),
+  }) => request<EnvironmentReading>('/api/sensor-data', { method: 'POST', body: JSON.stringify(data) }),
+  getDemoSensor: () => request<DemoSensor>('/api/demo/sensor'),
 
   // Risk
-  getRisk: (code: string) => fetchApi<RiskReport>(`/api/plants/${code}/risk`),
+  getRisk: (code: string) => request<RiskReport>(`/api/plants/${code}/risk`),
 
   // Stats
-  getStats: () => fetchApi<DashboardStats>('/api/stats'),
+  getStats: () => request<DashboardStats>('/api/stats'),
 
   // Report
-  getReport: (code: string) => fetchApi<any>(`/api/plants/${code}/report`),
+  getReport: (code: string) => request<any>(`/api/plants/${code}/report`),
 };
