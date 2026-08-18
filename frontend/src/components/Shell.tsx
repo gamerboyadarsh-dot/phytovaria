@@ -75,8 +75,8 @@ export function Shell() {
         <div className="sidebar-footer">
           <div style={{ fontSize: 11, color: 'var(--clr-text-3)', lineHeight: 1.5 }}>
             <strong>PhytoVaria v1.0</strong><br />
-            SIH 2024 Prototype<br />
-            <em>Demo use only</em>
+            Product Preview<br />
+            <em>Demonstration environment</em>
           </div>
         </div>
       </aside>

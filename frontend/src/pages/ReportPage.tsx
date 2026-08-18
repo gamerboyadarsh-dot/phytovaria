@@ -258,7 +258,7 @@ export function ReportPage() {
         <div className="disclaimer">
           {risk?.disclaimer}
           <br /><br />
-          PhytoVaria is a prototype developed for Smart India Hackathon 2024.
+          PhytoVaria is a genomics platform for research and assessment.
           It is intended as a demonstration of genomic interpretation technology.
           This report should NOT be used as the sole basis for agricultural decision-making.
         </div>

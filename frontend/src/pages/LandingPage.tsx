@@ -31,7 +31,7 @@ export function LandingPage() {
       <div className="landing-hero">
         <div className="landing-eyebrow">
           <Dna size={12} />
-          Smart India Hackathon 2024 — Genomics Track
+          PLANT GENOMICS • VARIANT INTELLIGENCE
         </div>
 
         <h1 className="landing-title">
